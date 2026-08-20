@@ -1,4 +1,4 @@
-"""Тесты маршрутов."""
+"""Тесты маршрутов для проекта YaNews."""
 
 from http import HTTPStatus
 
@@ -7,18 +7,20 @@ from django.urls import reverse
 from pytest_django.asserts import assertRedirects
 from pytest_lazyfixture import lazy_fixture as lf
 
+NEWS_ID = (1,)
+
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
     'name, args',
     (
         ('news:home', None),
-        ('news:detail', lf('news_id_for_args')),
+        ('news:detail', NEWS_ID),
         ('users:login', None),
         ('users:signup', None),
     ),
 )
-def test_pages_availability_for_anonymous_user(client, name, args):
+def test_pages_availability_for_anonymous_user(client, news, name, args):
     """Проверяет доступность общедоступных страниц для анонима."""
     url = reverse(name, args=args)
     response = client.get(url)
@@ -27,10 +29,7 @@ def test_pages_availability_for_anonymous_user(client, name, args):
 
 @pytest.mark.django_db
 def test_logout_availability_for_anonymous_user(client):
-    """
-    Проверяет доступность страницы выхода
-    для анонима через POST-запрос.
-    """
+    """Проверяет доступность страницы выхода для анонима (POST-запрос)."""
     url = reverse('users:logout')
     response = client.post(url)
     assert response.status_code == HTTPStatus.OK
@@ -48,10 +47,10 @@ def test_logout_availability_for_anonymous_user(client):
     ('news:edit', 'news:delete'),
 )
 def test_pages_availability_for_different_users(
-        parametrized_client, name, comment_id_for_args, expected_status
+        parametrized_client, name, comment, expected_status
 ):
     """Проверяет доступ к редактированию и удалению чужих комментариев."""
-    url = reverse(name, args=comment_id_for_args)
+    url = reverse(name, args=(comment.id,))
     response = parametrized_client.get(url)
     assert response.status_code == expected_status
 
@@ -61,10 +60,10 @@ def test_pages_availability_for_different_users(
     'name',
     ('news:edit', 'news:delete'),
 )
-def test_redirects(client, name, comment_id_for_args):
-    """Проверяет редирект анонимного пользователя на страницу авторизации."""
+def test_redirects(client, name, comment):
+    """Проверяет редирект анонимного пользователя на авторизацию."""
     login_url = reverse('users:login')
-    url = reverse(name, args=comment_id_for_args)
+    url = reverse(name, args=(comment.id,))
     expected_url = f'{login_url}?next={url}'
 
     response = client.get(url)

@@ -50,18 +50,3 @@ def comment(news, author):
         author=author,
         text='Текст комментария'
     )
-
-
-@pytest.fixture
-def comment_id_for_args(comment):
-    """
-    Возвращает кортеж с id комментария
-    для использования в URL.
-    """
-    return (comment.id,)
-
-
-@pytest.fixture
-def news_id_for_args(news):
-    """Возвращает кортеж с id новости для использования в URL."""
-    return (news.id,)
