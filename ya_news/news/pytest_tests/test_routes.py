@@ -3,35 +3,37 @@
 from http import HTTPStatus
 
 import pytest
-from django.urls import reverse
 from pytest_django.asserts import assertRedirects
 from pytest_lazyfixture import lazy_fixture as lf
 
-NEWS_ID = (1,)
+pytestmark = pytest.mark.django_db
 
-
-@pytest.mark.django_db
-@pytest.mark.parametrize(
-    'name, args',
-    (
-        ('news:home', None),
-        ('news:detail', NEWS_ID),
-        ('users:login', None),
-        ('users:signup', None),
-    ),
+PUBLIC_URLS = (
+    lf('home_url'),
+    lf('detail_url'),
+    lf('login_url'),
+    lf('signup_url'),
 )
-def test_pages_availability_for_anonymous_user(client, news, name, args):
-    """Проверяет доступность общедоступных страниц для анонима."""
-    url = reverse(name, args=args)
+
+EDIT_DELETE_URLS = (
+    lf('edit_url'),
+    lf('delete_url'),
+)
+
+
+@pytest.mark.parametrize('url', PUBLIC_URLS)
+def test_pages_availability_for_anonymous_user(client, url):
+    """
+    Проверяет доступность общедоступных страниц
+    для анонима (GET-запросы).
+    """
     response = client.get(url)
     assert response.status_code == HTTPStatus.OK
 
 
-@pytest.mark.django_db
-def test_logout_availability_for_anonymous_user(client):
+def test_logout_availability_for_anonymous_user(client, logout_url):
     """Проверяет доступность страницы выхода для анонима (POST-запрос)."""
-    url = reverse('users:logout')
-    response = client.post(url)
+    response = client.post(logout_url)
     assert response.status_code == HTTPStatus.OK
 
 
@@ -42,29 +44,43 @@ def test_logout_availability_for_anonymous_user(client):
         (lf('author_client'), HTTPStatus.OK)
     ),
 )
-@pytest.mark.parametrize(
-    'name',
-    ('news:edit', 'news:delete'),
-)
+@pytest.mark.parametrize('url', EDIT_DELETE_URLS)
 def test_pages_availability_for_different_users(
-        parametrized_client, name, comment, expected_status
+        parametrized_client, url, expected_status
 ):
     """Проверяет доступ к редактированию и удалению чужих комментариев."""
-    url = reverse(name, args=(comment.id,))
     response = parametrized_client.get(url)
     assert response.status_code == expected_status
 
 
-@pytest.mark.django_db
-@pytest.mark.parametrize(
-    'name',
-    ('news:edit', 'news:delete'),
-)
-def test_redirects(client, name, comment):
+@pytest.mark.parametrize('url', EDIT_DELETE_URLS)
+def test_redirects(client, url, login_url):
     """Проверяет редирект анонимного пользователя на авторизацию."""
-    login_url = reverse('users:login')
-    url = reverse(name, args=(comment.id,))
     expected_url = f'{login_url}?next={url}'
-
     response = client.get(url)
     assertRedirects(response, expected_url)
+
+
+def test_successful_creation_redirects(author_client, detail_url):
+    """Проверяет редирект после успешного создания комментария."""
+    url_to_comments = detail_url + '#comments'
+    response = author_client.post(
+        detail_url, data={'text': 'Текст комментария'}
+    )
+    assertRedirects(response, url_to_comments)
+
+
+def test_successful_edit_redirects(author_client, edit_url, detail_url):
+    """Проверяет редирект после успешного редактирования."""
+    url_to_comments = detail_url + '#comments'
+    response = author_client.post(
+        edit_url, data={'text': 'Обновлённый комментарий'}
+    )
+    assertRedirects(response, url_to_comments)
+
+
+def test_successful_delete_redirects(author_client, delete_url, detail_url):
+    """Проверяет редирект после успешного удаления."""
+    url_to_comments = detail_url + '#comments'
+    response = author_client.delete(delete_url)
+    assertRedirects(response, url_to_comments)
