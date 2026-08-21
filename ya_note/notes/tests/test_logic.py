@@ -24,9 +24,9 @@ class TestLogic(BaseTest):
 
     def test_anonymous_user_cant_create_note(self):
         """Аноним не может создать заметку."""
-        notes_count_before = Note.objects.count()
+        Note.objects.all().delete()
         self.client.post(self.add_url, data=self.form_data)
-        self.assertEqual(Note.objects.count(), notes_count_before)
+        self.assertEqual(Note.objects.count(), 0)
 
     def test_logged_user_can_create_note(self):
         """Авторизованный юзер может создать заметку."""
@@ -76,6 +76,7 @@ class TestLogic(BaseTest):
         self.assertEqual(self.note.title, self.form_data['title'])
         self.assertEqual(self.note.text, self.form_data['text'])
         self.assertEqual(self.note.slug, self.form_data['slug'])
+        self.assertEqual(self.note.author, self.author)
         self.assertEqual(Note.objects.count(), notes_count_before)
 
     def test_other_user_cant_edit_note(self):
@@ -90,10 +91,10 @@ class TestLogic(BaseTest):
         response = self.client.post(self.edit_url, data=self.form_data)
         self.assertEqual(response.status_code, HTTPStatus.NOT_FOUND)
 
-        self.note.refresh_from_db()
-        self.assertEqual(self.note.title, original_title)
-        self.assertEqual(self.note.text, original_text)
-        self.assertEqual(self.note.slug, original_slug)
+        note_from_db = Note.objects.get(pk=self.note.pk)
+        self.assertEqual(note_from_db.title, original_title)
+        self.assertEqual(note_from_db.text, original_text)
+        self.assertEqual(note_from_db.slug, original_slug)
         self.assertEqual(Note.objects.count(), notes_count_before)
 
     def test_author_can_delete_note(self):
@@ -102,6 +103,7 @@ class TestLogic(BaseTest):
         self.client.force_login(self.author)
         self.client.post(self.delete_url)
         self.assertEqual(Note.objects.count(), notes_count_before - 1)
+        self.assertFalse(Note.objects.filter(pk=self.note.pk).exists())
 
     def test_other_user_cant_delete_note(self):
         """Пользователь не может удалить чужую заметку."""
